@@ -63,6 +63,26 @@ sobel_filtered_pixel(float *s, int i, int j , int ncols, int nrows, float *gx, f
 
    // ADD CODE HERE:  add your code here for computing the sobel stencil computation at location (i,j)
    // of input s, returning a float
+   float Gx = 0.0;
+   float Gy = 0.0;
+
+   // 3x3 Sobel filter stencil centered at (i, j)
+   int index = 0;  // For accessing gx and gy arrays
+   for (int di = -1; di <= 1; di++) {      // Loop over 3x3 neighborhood
+       for (int dj = -1; dj <= 1; dj++) {
+           int ni = i + di;                // Neighbor row
+           int nj = j + dj;                // Neighbor column
+
+           // Check if the neighbor indices are within the bounds
+           if (ni >= 0 && ni < nrows && nj >= 0 && nj < ncols) {
+               Gx += s[ni * ncols + nj] * gx[index];
+               Gy += s[ni * ncols + nj] * gy[index];
+           }
+           index++;
+       }
+   }
+    t = sqrt(Gx * Gx + Gy * Gy);
+
 
    return t;
 }
@@ -92,6 +112,24 @@ sobel_kernel_gpu(float *s,  // source image pixels
 {
    // ADD CODE HERE: insert your code here that iterates over every (i,j) of input,  makes a call
    // to sobel_filtered_pixel, and assigns the resulting value at location (i,j) in the output.
+
+    
+    // Calculate 1D index and stride
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+
+    // Process pixels with grid-stride loop
+    for (int i = idx; i < n; i += stride) {
+        // Convert 1D index to 2D coordinates
+        int row = i / ncols;
+        int col = i % ncols;
+        
+        // Only process if within image bounds
+        if (row < nrows && col < ncols) {
+            d[i] = sobel_filtered_pixel(s, row, col, ncols, nrows, gx, gy);
+        }
+    }
 
    // because this is CUDA, you need to use CUDA built-in variables to compute an index and stride
    // your processing motif will be very similar here to that we used for vector add in Lab #2
@@ -159,9 +197,24 @@ main (int ac, char *av[])
    // ADD CODE HERE: insert your code here to set a different number of thread blocks or # of threads per block
 
 
+   // Check if command line arguments are provided
+    if (ac == 3) {
+        nBlocks = atoi(av[1]);
+        nThreadsPerBlock = atoi(av[2]);
+    } else if (ac != 1) {
+        printf("Usage: %s [num_blocks num_threads_per_block]\n", av[0]);
+        printf("Example: %s 128 256\n", av[0]);
+        return 1;
+    }
+    // Calculate total number of threads and validate
+    int totalThreads = nBlocks * nThreadsPerBlock;
+    if (totalThreads <= 0) {
+        printf("Error: Invalid thread configuration. Both arguments must be positive integers.\n");
+        return 1;
+    }
 
    printf(" GPU configuration: %d blocks, %d threads per block \n", nBlocks, nThreadsPerBlock);
-
+  
    // invoke the kernel on the device
    sobel_kernel_gpu<<<nBlocks, nThreadsPerBlock>>>(in_data_floats, out_data_floats, nvalues, data_dims[1], data_dims[0], device_gx, device_gy);
 

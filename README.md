@@ -113,5 +113,13 @@ Usage:
 
     python imshow.py filename-of-raw-8bit-bytes int-cols-width int-rows-height
 
+# how to run the sobel_gpu code
+cd build
+cmake ../  
+make
+./sobel_gpu # this default with 1 block with 256 threads
+if you want to specify the number of blocks and the number of threads,
+you can add two integers such as:
+./sobel_gpu 64 1024 # 64 blocks, 1024 threads per block
 
 # eof
